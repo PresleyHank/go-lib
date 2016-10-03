@@ -16,6 +16,7 @@ This version is modified by Sudhi Herle:
 - addition of a SHA256 checksum over the entire CDB (appended to end
   of file) and verified when opened
 
+- uses Zi Long Tan's superfast hash
 
 [1]: http://cr.yp.to/cdb.html
 
