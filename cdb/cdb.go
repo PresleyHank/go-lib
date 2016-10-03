@@ -16,7 +16,7 @@ import (
 	"encoding/binary"
 
     // Sudhi's utility library
-    "util"
+    "github.com/opencoff/go-lib/util"
 )
 
 const indexSize = 256 * 8
