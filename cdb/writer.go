@@ -11,7 +11,7 @@ import (
     "crypto/sha256"
 
     // Sudhi's utility library
-    "util"
+    "github.com/opencoff/go-lib/util"
 )
 
 var ErrTooMuchData = errors.New("CDB files are limited to 4GB of data")
