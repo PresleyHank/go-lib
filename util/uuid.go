@@ -10,6 +10,7 @@ package util
 import (
     "fmt"
     "crypto/rand"
+    "encoding/hex"
 )
 
 
@@ -41,6 +42,24 @@ func MakeUUID(b []byte) *UUID {
 }
 
 
+// Return a serializable ASCII string
+func (u *UUID) Marshal() string {
+    return hex.EncodeToString(u.b[:])
+}
+
+// Unmarshal a string
+func UnmarshalUUID(s string) *UUID {
+    b, err := hex.DecodeString(s)
+    if err == nil && len(b) == 16 {
+        u := &UUID{}
+        copy(u.b[:], b)
+        return u
+    }
+
+    return nil
+}
+
+
 func (u *UUID) Bytes() []byte {
     return u.b[:]
 }
@@ -49,3 +68,5 @@ func (u *UUID) String() string {
     b := u.b[:]
     return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
+
+
