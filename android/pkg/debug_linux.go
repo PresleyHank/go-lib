@@ -25,7 +25,7 @@ import (
 // Return the calling uid as a pseudo package
 func getself() *Pkg {
     var p *Pkg
-    if fd, err = os.Open("/system/build.prop"); err == nil {
+    if fd, err := os.Open("/system/build.prop"); err == nil {
         fd.Close()
         return nil
     }
