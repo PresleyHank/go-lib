@@ -30,8 +30,8 @@ func getself() *Pkg {
         return nil
     }
 
-    pid := fmt.Sprintf("caller-pid-%v", os.Getpid())
-    p := &Pkg{Name: pid, Uid: uint32(os.Getuid())}
-    return p
+    uid := uint32(os.Getuid())
+    nm  := fmt.Sprintf("caller-uid-%v", uid)
+    return &Pkg{Name: nm, Uid: uid}
 }
 
