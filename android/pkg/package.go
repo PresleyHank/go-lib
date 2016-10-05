@@ -192,6 +192,13 @@ func (db *PackageDB) refresh() error {
         byUid[p.Uid] = append(byUid[p.Uid], p)
     }
 
+    // Finally, if we are NOT on Android, add the calling process to
+    // the DB for debugging purposes
+    if p := getself(); p != nil {
+        byUid[p.Uid]   = append(byUid[p.Uid], p)
+        byName[p.Name] = p
+    }
+
     db.byName  = byName
     db.byUid   = byUid
     db.lastUpd = time.Now().UTC()
