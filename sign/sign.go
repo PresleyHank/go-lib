@@ -32,7 +32,6 @@ import (
     "crypto/sha256"
     "crypto/sha512"
     "encoding/base64"
-    "encoding/binary"
 
     "gopkg.in/yaml.v2"
     "golang.org/x/crypto/scrypt"
@@ -61,6 +60,13 @@ type PublicKey struct {
 type Keypair struct {
     Sec     PrivateKey
     Pub     PublicKey
+}
+
+
+// An Ed25519 Signature
+type Signature struct {
+    Sig     []byte      // 32 byte digital signature
+    Pkhash  []byte      // [0:16] SHA256 hash of public key needed for verification
 }
 
 
@@ -119,6 +125,7 @@ type serializedPubKey struct {
 // Serialized signature
 type signature struct {
     Comment     string  `yaml:"comment,omitempty"`
+    Pkhash      string  `yaml:"pkhash,omitempty"`
     Signature   string  `yaml:"signature"`
 }
 
@@ -220,94 +227,6 @@ func ReadPrivateKey(fn string, pw string) (*PrivateKey, error) {
 
 
 
-// Read the public key from 'fn' and create new instance of
-// PublicKey
-func ReadPublicKey(fn string) (*PublicKey, error) {
-    yml, err := ioutil.ReadFile(fn)
-    if err != nil { return nil, err }
-
-    var spk serializedPubKey
-
-    err = yaml.Unmarshal(yml, &spk)
-    if err != nil { return nil, fmt.Errorf("can't parse YAML in %s: %s", fn, err) }
-
-    pk  := &PublicKey{}
-    b64 := base64.StdEncoding.DecodeString
-
-    pk.Pk,     err  = b64(spk.Pk)
-    if err != nil { return nil, fmt.Errorf("can't decode YAML:Pk in %s: %s", fn, err) }
-
-    // Simple sanity checks
-    if len(pk.Pk) == 0 {
-        return nil, fmt.Errorf("public key data is empty?")
-    }
-
-    return pk, nil
-}
-
-
-// Unlink a file.
-func unlink(f string) {
-    st, err := os.Stat(f)
-    if err == nil {
-        if !st.Mode().IsRegular() { panic(fmt.Sprintf("%s can't be unlinked. Not a regular file?", f)) }
-
-        os.Remove(f)
-        return
-    }
-
-    // XXX Go has no easy way to do os.file.isexist() ala python; it has
-    //     a confusing fuktard full of err checks all over the place.
-    //     Here, err != nil. But, I have no way of knowing if it is
-    //     becasue of ENOENT or some other error.
-}
-
-
-// Simple function to reliably write data to a file.
-// Does MORE than ioutil.WriteFile() - in that it doesn't trash the
-// existing file with an incomplete write.
-func writeFile(fn string, b []byte, mode uint32) error {
-    tmp := fmt.Sprintf("%s.tmp", fn)
-    unlink(tmp)
-
-    fd, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(mode))
-    if err != nil { return fmt.Errorf("Can't create key file %s: %s", tmp, err) }
-
-    _, err  = fd.Write(b)
-    if err != nil {
-        fd.Close()
-        return fmt.Errorf("Can't write %v bytes to %s: %s", len(b), tmp, err)
-    }
-
-    fd.Close()  // we ignore close(2) errors; unrecoverable anyway.
-
-    os.Rename(tmp, fn)
-    return nil
-}
-
-
-// Serialize Integers; used for calculating sha checksum
-func serializeInt(u uint32) []byte {
-    var b [4]byte
-
-    binary.LittleEndian.PutUint32(b[:], u)
-    return b[:]
-}
-
-
-
-// Serialize Public Keys
-func (pk *PublicKey) serialize(fn, comment string) error {
-    b64 := base64.StdEncoding.EncodeToString
-    spk := &serializedPubKey{Comment: comment}
-
-    spk.Pk     = b64(pk.Pk)
-
-    out, err := yaml.Marshal(spk)
-    if err != nil { return fmt.Errorf("Can't marahal to YAML: %s", err) }
-
-    return writeFile(fn, out, 0644)
-}
 
 // Serialize the private key to a file
 // Format: YAML
@@ -358,9 +277,254 @@ func (sk *PrivateKey) serialize(fn, comment string, pw string) error {
     ssk.P      = esk.p
 
     out, err := yaml.Marshal(ssk)
-    if err != nil { return fmt.Errorf("Can't marahal to YAML: %s", err) }
+    if err   != nil { return fmt.Errorf("can't marahal to YAML: %s", err) }
 
     return writeFile(fn, out, 0600)
+}
+
+
+
+
+// Sign a prehashed Message; return the signature as opaque bytes
+// Signature is an YAML file:
+//    Comment: source file path
+//    Signature: Ed25519 signature
+func (sk *PrivateKey) SignMessage(ck []byte, comment string) (*Signature, error) {
+    x := Ed.PrivateKey(sk.Sk)
+
+    sig, err := x.Sign(rand.Reader, ck, crypto.Hash(0))
+    if err   != nil {
+        return nil, fmt.Errorf("can't sign %x: %s", ck, err)
+    }
+
+    pkh := sha256.Sum256(sk.pk)
+
+    return &Signature{Sig: sig, Pkhash: pkh[:16]}, nil
+}
+
+
+
+// Read and sign a file
+//
+// We calculate the signature differently here: We first calculate
+// the SHA-512 checksum of the file and its size. We sign the
+// checksum.
+func (sk *PrivateKey) SignFile(fn string) (*Signature, error) {
+
+    ck, err := fileCksum(fn, sha512.New())
+    if err  != nil { return nil, err }
+
+    return sk.SignMessage(ck, fn)
+}
+
+
+// -- Signature Methods --
+
+
+// Read serialized signature from file 'fn' and construct a
+// Signature object
+func ReadSignature(fn string) (*Signature, error) {
+    yml, err := ioutil.ReadFile(fn)
+    if err   != nil { return nil, err }
+
+    return MakeSignature(yml)
+}
+
+
+// Parse serialized signature from bytes 'b' and construct a
+// Signature object
+func MakeSignature(b []byte) (*Signature, error) {
+    var ss signature
+    err    := yaml.Unmarshal(b, &ss)
+    if err != nil { return nil, fmt.Errorf("can't parse YAML signature: %s", err) }
+
+    b64    := base64.StdEncoding.DecodeString
+
+    s, err := b64(ss.Signature)
+    if err != nil {
+        return nil, fmt.Errorf("can't decode Base64:Signature <%s>: %s", ss.Signature, err)
+    }
+
+    p, err := b64(ss.Pkhash)
+    if err != nil {
+        return nil, fmt.Errorf("can't decode Base64:Pkhash <%s>: %s", ss.Pkhash, err)
+    }
+    
+    return &Signature{Sig: s, Pkhash: p}, nil
+}
+
+
+
+// Serialize a signature suitiable for storing in durable media
+func (sig *Signature) Serialize(comment string) ([]byte, error) {
+
+    sigs := base64.StdEncoding.EncodeToString(sig.Sig)
+    pks  := base64.StdEncoding.EncodeToString(sig.Pkhash)
+    ss   := &signature{Comment: comment, Pkhash: pks, Signature: sigs}
+
+    out, err := yaml.Marshal(ss)
+    if err != nil {
+        return nil, fmt.Errorf("can't marshal signature of %x to YAML: %s", sig.Sig, err)
+    }
+
+    return out, nil
+}
+
+
+// Serialize signature to an output file 'f'
+func (sig *Signature) SerializeFile(fn, comment string) error {
+    b, err := sig.Serialize(comment)
+    if err != nil { return err }
+
+    return writeFile(fn, b, 0644)
+}
+
+
+
+// Return true if a given PK matches the PKhash we have
+func (sig *Signature) IsPKMatch(pk *PublicKey) bool {
+    h := sha256.Sum256(pk.Pk)
+    return subtle.ConstantTimeCompare(h[:16], sig.Pkhash) == 1
+}
+
+
+//  --- Public Key Methods ---
+
+
+// Read the public key from 'fn' and create new instance of
+// PublicKey
+func ReadPublicKey(fn string) (*PublicKey, error) {
+    var err error
+    var yml []byte
+
+    if yml, err = ioutil.ReadFile(fn); err != nil { return nil, err }
+
+    var spk serializedPubKey
+
+    if err = yaml.Unmarshal(yml, &spk); err != nil {
+        return nil, fmt.Errorf("can't parse YAML in %s: %s", fn, err)
+    }
+
+    pk  := &PublicKey{}
+    b64 := base64.StdEncoding.DecodeString
+
+    if pk.Pk, err = b64(spk.Pk); err != nil {
+        return nil, fmt.Errorf("can't decode YAML:Pk in %s: %s", fn, err)
+    }
+
+    // Simple sanity checks
+    if len(pk.Pk) == 0 {
+        return nil, fmt.Errorf("public key data is empty?")
+    }
+
+    return pk, nil
+}
+
+
+// Serialize Public Keys
+func (pk *PublicKey) serialize(fn, comment string) error {
+    b64 := base64.StdEncoding.EncodeToString
+    spk := &serializedPubKey{Comment: comment}
+
+    spk.Pk     = b64(pk.Pk)
+
+    out, err := yaml.Marshal(spk)
+    if err != nil { return fmt.Errorf("Can't marahal to YAML: %s", err) }
+
+    return writeFile(fn, out, 0644)
+}
+
+
+
+
+// Verify a signature 'sig' for file 'fn' against public key 'pk'
+// Return True if signature matches, False otherwise
+func (pk *PublicKey) VerifyFile(fn string, sig *Signature) (bool, error) {
+
+    ck, err := fileCksum(fn, sha512.New())
+    if err != nil { return false, err }
+
+    return pk.VerifyMessage(ck, sig)
+}
+
+
+// Verify a signature 'sig' for a pre-calculated checksum 'ck' against public key 'pk'
+// Return True if signature matches, False otherwise
+func (pk *PublicKey) VerifyMessage(ck []byte, sig *Signature) (bool, error) {
+
+    x := Ed.PublicKey(pk.Pk)
+    return Ed.Verify(x, ck, sig.Sig), nil
+}
+
+
+
+
+// Utility function: Ask user for an interactive password
+// If verify is true, confirm a second time.
+// Mistakes during confirmation cause the process to restart upto a
+// maximum of 2 times.
+func Askpass(prompt string, verify bool) (string, error) {
+
+    for i := 0; i < 2; i++ {
+        fmt.Printf("%s: ", prompt)
+        pw1, err := terminal.ReadPassword(int(syscall.Stdin))
+        fmt.Printf("\n")
+        if err != nil { return "", err }
+        if !verify { return string(pw1), nil }
+
+        fmt.Printf("%s again: ", prompt)
+        pw2, err := terminal.ReadPassword(int(syscall.Stdin))
+        fmt.Printf("\n")
+        if err != nil { return "", err }
+
+        a := string(pw1)
+        b := string(pw2)
+        if a == b { return a, nil }
+    }
+
+    return "", fmt.Errorf("Too many tries getting password")
+}
+
+
+// -- Internal Utility Functions --
+
+// Unlink a file.
+func unlink(f string) {
+    st, err := os.Stat(f)
+    if err == nil {
+        if !st.Mode().IsRegular() { panic(fmt.Sprintf("%s can't be unlinked. Not a regular file?", f)) }
+
+        os.Remove(f)
+        return
+    }
+
+    // XXX Go has no easy way to do os.file.isexist() ala python; it has
+    //     a confusing fuktard full of err checks all over the place.
+    //     Here, err != nil. But, I have no way of knowing if it is
+    //     becasue of ENOENT or some other error.
+}
+
+
+// Simple function to reliably write data to a file.
+// Does MORE than ioutil.WriteFile() - in that it doesn't trash the
+// existing file with an incomplete write.
+func writeFile(fn string, b []byte, mode uint32) error {
+    tmp := fmt.Sprintf("%s.tmp", fn)
+    unlink(tmp)
+
+    fd, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(mode))
+    if err != nil { return fmt.Errorf("Can't create key file %s: %s", tmp, err) }
+
+    _, err  = fd.Write(b)
+    if err != nil {
+        fd.Close()
+        return fmt.Errorf("Can't write %v bytes to %s: %s", len(b), tmp, err)
+    }
+
+    fd.Close()  // we ignore close(2) errors; unrecoverable anyway.
+
+    os.Rename(tmp, fn)
+    return nil
 }
 
 
@@ -408,128 +572,4 @@ func fileCksum(fn string, h hash.Hash) ([]byte, error) {
     return ck, nil
 }
 
-// internal function that operates on bytes
-func (sk *PrivateKey) sign(ck []byte) (string, error) {
-    x := Ed.PrivateKey(sk.Sk)
-
-    sig, err := x.Sign(rand.Reader, ck, crypto.Hash(0))
-    if err != nil { return "", fmt.Errorf("Can't sign %x: %s", ck, err) }
-
-    asig := base64.StdEncoding.EncodeToString(sig)
-    return asig, nil
-}
-
-
-// Verify checksum 'ck' against base64 encoded signature 'xsig'
-func (pk *PublicKey) verify(ck []byte, xsig string)  (bool, error) {
-    sig, err := base64.StdEncoding.DecodeString(xsig)
-    if err != nil {
-        return false, fmt.Errorf("Can't decode Base64:Signature <%s>: %s", xsig, err)
-    }
-
-    x := Ed.PublicKey(pk.Pk)
-    return Ed.Verify(x, ck, sig), nil
-}
-
-// Sign a prehashed Message; return the signature as opaque bytes
-// Signature is an YAML file:
-//    Comment: source file path
-//    Signature: Ed25519 signature
-func (sk *PrivateKey) SignMessage(ck []byte, comment string) ([]byte, error) {
-
-    sig, err := sk.sign(ck)
-    if err != nil { return nil, err }
-
-    if len(comment) == 0 { comment = fmt.Sprintf("cksum=%x", ck) }
-
-    ss  := &signature{Comment: comment, Signature: sig}
-
-    out, err := yaml.Marshal(ss)
-    if err != nil { return nil, fmt.Errorf("Can't marahal signature of %x to YAML: %s", ck, err) }
-
-    return out, nil
-}
-
-
-
-// Sign a prehashed Message; return the signature as raw b64 bytes
-func (sk *PrivateKey) RawSignMessage(ck []byte) (string, error) {
-    return sk.sign(ck)
-}
-
-
-// Read and sign a file; return the signature as opaque bytes
-// Signature is an YAML file:
-//    Comment: source file path
-//    Signature: Ed25519 signature
-//
-// We calculate the signature differently here: We first calculate
-// the SHA-512 checksum of the file and its size. We sign the
-// checksum.
-func (sk *PrivateKey) SignFile(fn string) ([]byte, error) {
-
-    ck, err := fileCksum(fn, sha512.New())
-    if err != nil { return nil, err }
-
-    return sk.SignMessage(ck, fn)
-}
-
-
-// Verify a signature for file 'fn' against public key 'pk'
-// 'sig' is opaque bytes - should be identical to the value returned
-// by SignFile() above. The caller typically reads this sig from an
-// ancialliary file.
-// Return True if signature matches, False otherwise
-func (pk *PublicKey) VerifyFile(fn string, isig []byte) (bool, error) {
-
-    ck, err := fileCksum(fn, sha512.New())
-    if err != nil { return false, err }
-
-    return pk.VerifyMessage(ck, isig)
-}
-
-
-// Verify checksum against serialized signature
-func (pk *PublicKey) VerifyMessage(ck []byte, isig []byte) (bool, error) {
-
-    // Unmarshal the signature bytes
-    var ss signature
-    err := yaml.Unmarshal(isig, &ss)
-    if err != nil { return false, fmt.Errorf("Can't parse signature: %s", err) }
-
-    return pk.verify(ck, ss.Signature)
-}
-
-
-// Verify a raw base64 signature against a checksum
-func (pk *PublicKey) RawVerifyMessage(ck []byte, sig string) (bool, error) {
-    return pk.verify(ck, sig)
-}
-
-
-// Utility function: Ask user for an interactive password
-// If verify is true, confirm a second time.
-// Mistakes during confirmation cause the process to restart upto a
-// maximum of 2 times.
-func Askpass(prompt string, verify bool) (string, error) {
-
-    for i := 0; i < 2; i++ {
-        fmt.Printf("%s: ", prompt)
-        pw1, err := terminal.ReadPassword(int(syscall.Stdin))
-        fmt.Printf("\n")
-        if err != nil { return "", err }
-        if !verify { return string(pw1), nil }
-
-        fmt.Printf("%s again: ", prompt)
-        pw2, err := terminal.ReadPassword(int(syscall.Stdin))
-        fmt.Printf("\n")
-        if err != nil { return "", err }
-
-        a := string(pw1)
-        b := string(pw2)
-        if a == b { return a, nil }
-    }
-
-    return "", fmt.Errorf("Too many tries getting password")
-}
 // EOF
