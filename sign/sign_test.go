@@ -120,8 +120,6 @@ func Test0(t *testing.T) {
     sk, err  = sign.ReadPrivateKey(skf, "abcdef")
     assert(err != nil, t, "ReadSK() wrong pw fail")
 
-    // XXX Create a corrupted SKF with wrong parameters and see if it
-    //     fails
     badf := fmt.Sprintf("%s/badf.key", dn)
     err   = ioutil.WriteFile(badf, []byte(badsk), 0600)
     assert(err == nil, t, "write badsk")
@@ -171,9 +169,25 @@ func Test1(t *testing.T) {
     assert(ok, t, "verify fail")
 
 
+    // Now sign a file
+    dn := tempdir(t)
+    bn := fmt.Sprintf("%s/k", dn)
+
+    pkf := fmt.Sprintf("%s.pub", bn)
+    skf := fmt.Sprintf("%s.key", bn)
+
+    err = kp.Serialize(bn, "", "")
+    assert(err == nil, t, "keyPair.Serialize() fail")
+
+    // Now read the private key and sign
+    sk, err = sign.ReadPrivateKey(skf, "")
+    assert(err == nil, t, "readSK fail")
+
+    pk, err = sign.ReadPublicKey(pkf)
+    assert(err == nil, t, "ReadPK fail")
+
     var buf [8192]byte
 
-    dn := tempdir(t)
     zf := fmt.Sprintf("%s/file.dat", dn)
     fd, err := os.OpenFile(zf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
     assert(err == nil, t, "file.dat creat file")

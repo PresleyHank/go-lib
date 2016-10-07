@@ -146,7 +146,6 @@ func NewKeypair() (*Keypair, error) {
 
     pk.Pk = []byte(p)
     sk.Sk = []byte(s)
-    sk.pk = pk.Pk
 
     return kp, nil
 }
@@ -297,7 +296,11 @@ func (sk *PrivateKey) SignMessage(ck []byte, comment string) (*Signature, error)
         return nil, fmt.Errorf("can't sign %x: %s", ck, err)
     }
 
-    pkh := sha256.Sum256(sk.pk)
+    esk := Ed.PrivateKey(sk.Sk)     // type cast
+    epk := esk.Public()             // interface
+    xpk := epk.(Ed.PublicKey)       // type assertion
+    pk  := []byte(xpk)              // cast
+    pkh := sha256.Sum256(pk)
 
     return &Signature{Sig: sig, Pkhash: pkh[:16]}, nil
 }
