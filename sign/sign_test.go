@@ -16,6 +16,7 @@ package sign_test
 import (
     "os"
     "fmt"
+    "io/ioutil"
     "testing"
     "runtime"
     "crypto/rand"
@@ -56,6 +57,7 @@ func tempdir(t *testing.T) string {
     err := os.MkdirAll(tmp, 0755)
     assert(err == nil, t, fmt.Sprintf("mkdir -p %s: %s", tmp, err))
 
+    t.Logf("Tempdir is %s", tmp)
     return tmp
 }
 
@@ -72,6 +74,17 @@ func fileExists(fn string) bool {
 }
 
 
+const badsk string = `
+esk: q8AP3/6C5F0zB8CLiuJsidx2gJYmrnyOmuoazEbKL5Uh+Jn/Zgw85fTbYfhjcbt48CJejBzsgPYRYR7wWECFRA==
+salt: uIdTQZotfnkaLkth9jsHvoQKMWdNZuE7dgVNADrRoeY=
+algo: scrypt-sha256
+verify: AOFLLC6h29+mvstWtMU1/zZFwHLBMMiI4mlW9DHpYdM=
+Z: 65536
+r: 8
+p: 1
+`
+
+
 // #1. Create new key pair, and read them back.
 func Test0(t *testing.T) {
     kp, err := sign.NewKeypair()
@@ -79,8 +92,6 @@ func Test0(t *testing.T) {
 
     dn := tempdir(t)
     bn := fmt.Sprintf("%s/t0", dn)
-
-    t.Logf("Tempdir is %s", dn)
 
     err = kp.Serialize(bn, "", "abc")
     assert(err == nil, t, "keyPair.Serialize() fail")
@@ -108,6 +119,15 @@ func Test0(t *testing.T) {
 
     sk, err  = sign.ReadPrivateKey(skf, "abcdef")
     assert(err != nil, t, "ReadSK() wrong pw fail")
+
+    // XXX Create a corrupted SKF with wrong parameters and see if it
+    //     fails
+    badf := fmt.Sprintf("%s/badf.key", dn)
+    err   = ioutil.WriteFile(badf, []byte(badsk), 0600)
+    assert(err == nil, t, "write badsk")
+
+    sk, err = sign.ReadPrivateKey(badf, "abc")
+    assert(err != nil, t, "badsk read fail")
 
     // Finally, with correct password it should work.
     sk, err  = sign.ReadPrivateKey(skf, "abc")
@@ -150,10 +170,64 @@ func Test1(t *testing.T) {
     assert(err == nil, t, "verify err")
     assert(ok, t, "verify fail")
 
+
+    var buf [8192]byte
+
+    dn := tempdir(t)
+    zf := fmt.Sprintf("%s/file.dat", dn)
+    fd, err := os.OpenFile(zf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+    assert(err == nil, t, "file.dat creat file")
+
+    for i := 0; i < 8; i++ {
+        rand.Read(buf[:])
+        n, err := fd.Write(buf[:])
+        assert(err == nil, t, fmt.Sprintf("file.dat write fail: %s", err))
+        assert(n == 8192, t, fmt.Sprintf("file.dat i/o fail: exp 8192 saw %v", n))
+    }
+    fd.Sync()
+    fd.Close()
+
+    sig, err := sk.SignFile(zf)
+    assert(err == nil, t, "file.dat sign fail")
+    assert(sig != nil, t, "file.dat sign nil")
+
+
+    ok, err  = pk.VerifyFile(zf, sig)
+    assert(err == nil, t, "file.dat verify fail")
+    assert(ok,         t, "file.dat verify false")
+
+
+    // Now, serialize the signature and read it back
+    sf := fmt.Sprintf("%s/file.sig", dn)
+    err = sig.SerializeFile(sf, "")
+    assert(err == nil, t, "sig serialize fail")
+
+
+    s2, err := sign.ReadSignature(sf)
+    assert(err == nil, t, "file.sig read fail")
+    assert(s2  != nil, t, "file.sig sig nil")
+
+    assert(byteEq(s2.Sig, sig.Sig), t, "sig compare fail")
+
+    // If we give a wrong file, verify must fail
+    st, err := os.Stat(zf)
+    assert(err == nil, t, "file.dat stat fail")
+    
+    n := st.Size();
+    assert(n == 8192 * 8, t, "file.dat size fail")
+
+    os.Truncate(zf, n-1)
+
+    st, err = os.Stat(zf)
+    assert(err == nil, t, "file.dat stat2 fail")
+    assert(st.Size() == (n-1), t, "truncate fail")
+
+    // Now verify this corrupt file
+    ok, err = pk.VerifyFile(zf, sig)
+    assert(err == nil, t, "file.dat corrupt i/o fail")
+    assert(!ok,        t, "file.dat corrupt verify false")
+
+    os.RemoveAll(dn)
 }
 
 
-// #3. Create new key pair, sign a rand buffer, serialize it and
-// read it back
-func Test2(t *testing.T) {
-}
