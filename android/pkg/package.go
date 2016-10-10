@@ -127,7 +127,7 @@ func (db *PackageDB) GetByUid(uid uint32) *Pkg {
 }
 
 
-// Start an iterator
+// Start an iterator - based on Name
 // Creates and returns a channel and feeds it data via a go routine
 func (db *PackageDB) IterateByName() chan *Pkg {
     ch := make(chan *Pkg, 1)
@@ -140,6 +140,19 @@ func (db *PackageDB) IterateByName() chan *Pkg {
     return ch
 }
 
+
+// Start an iterator - based on Uid
+// Creates and returns a channel and feeds it data via a go routine
+func (db *PackageDB) IterateByUid() chan []*Pkg {
+    ch := make(chan []*Pkg, 1)
+
+    go func(db *PackageDB, ch chan []*Pkg) {
+            for _, p := range db.byUid { ch <- p }
+            close(ch)
+       } (db, ch)
+
+    return ch
+}
 
 // If the packages.{list,xml} is newer than what we have, update our
 // in-core data.
