@@ -38,28 +38,28 @@ func New(seed uint32) *MT {
 
     if seed == 0 { seed = uint32(time.Now().UnixNano()) }
 
-    mt[0] = seed
-    for i := 1; i < 624; i++ {
-        y := mt[i-1]
-        mt[i] = 1812433253 * (y ^ (y >> 30)) + uint32(i)
+    m.mt[0] = seed
+
+    for i    := 1; i < 624; i++ {
+        y    := mt[i-1]
+        y    ^= (y >> 30)
+        mt[i] = (1812433253 * y) + uint32(i)
     }
 
     return m
 }
 
 
-func (m *MT) twist() int {
+func (m *MT) twist() {
     mt := m.mt[:]
-    for i := 0; i < 624; i++ {
-        // Get the most significant bit and add it to the less significant
-        // bits of the next number
-        y := (mt[i] & 0x80000000) | (mt[(i + 1) % 624] & 0x7fffffff)
+
+    for i    := 0; i < 624; i++ {
+        y    := (mt[i] & 0x80000000) + (mt[(i + 1) % 624] & 0x7fffffff)
         mt[i] = mt[(i + 397) % 624] ^ (y >> 1)
 
-        if y % 2 != 0 { mt[i] ^= 0x9908b0df }
+        if (y & 1) != 0 { mt[i] ^= 0x9908b0df }
     }
     m.i = 0
-    return m.i
 }
 
 
@@ -67,7 +67,10 @@ func (m *MT) Next() uint32 {
     mt := m.mt[:]
     i  := m.i
 
-    if i >= 624 { i = m.twist() }
+    if i >= 624 {
+        i = 0
+        m.twist()
+    }
 
     y := mt[i]
     y ^= (y >> 11)

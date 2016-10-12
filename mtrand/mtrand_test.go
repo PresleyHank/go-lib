@@ -12,7 +12,7 @@ import (
 
 func Test0(t *testing.T) {
 
-    m := mtrand.New(4587)
+    m := mtrand.New(1)
 
     for i := 0; i < 1000; i++ {
         z := m.Next()
