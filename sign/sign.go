@@ -181,22 +181,29 @@ func ReadPrivateKey(fn string, pw string) (*PrivateKey, error) {
     yml, err := ioutil.ReadFile(fn)
     if err != nil { return nil, err }
 
+    return MakePrivateKey(yml, pw)
+}
+
+
+// Make a private key from bytes 'yml' and password 'pw'. The bytes
+// are assumed to be serialized version of the private key.
+func MakePrivateKey(yml []byte, pw string) (*PrivateKey, error) {
     var ssk serializedPrivKey
 
-    err = yaml.Unmarshal(yml, &ssk)
-    if err != nil { return nil, fmt.Errorf("can't parse YAML in %s: %s", fn, err) }
+    err := yaml.Unmarshal(yml, &ssk)
+    if err != nil { return nil, fmt.Errorf("can't parse YAML: %s", err) }
 
     esk := &encPrivKey{N: ssk.N, r: ssk.R, p: ssk.P, Algo: ssk.Algo}
     b64 := base64.StdEncoding.DecodeString
 
     esk.Esk,  err = b64(ssk.Esk)
-    if        err != nil { return nil, fmt.Errorf("can't decode YAML:Esk in %s: %s", fn, err) }
+    if        err != nil { return nil, fmt.Errorf("can't decode YAML:Esk: %s", err) }
 
     esk.Salt, err = b64(ssk.Salt)
-    if        err != nil { return nil, fmt.Errorf("can't decode YAML:Salt in %s: %s", fn, err) }
+    if        err != nil { return nil, fmt.Errorf("can't decode YAML:Salt: %s", err) }
 
     esk.Verify, err = b64(ssk.Verify)
-    if          err != nil { return nil, fmt.Errorf("can't decode YAML:Verify in %s: %s", fn, err) }
+    if          err != nil { return nil, fmt.Errorf("can't decode YAML:Verify: %s", err) }
 
     sk := &PrivateKey{}
 
@@ -204,7 +211,7 @@ func ReadPrivateKey(fn string, pw string) (*PrivateKey, error) {
     pwb := sha512.Sum512([]byte(pw))
 
     xork, err := scrypt.Key(pwb[:], esk.Salt, int(esk.N), int(esk.r), int(esk.p), len(esk.Esk))
-    if    err != nil { return nil, fmt.Errorf("can't derive key in %s: %s", fn, err) }
+    if    err != nil { return nil, fmt.Errorf("can't derive key: %s", err) }
 
     hh := sha256.New()
     hh.Write(esk.Salt)
@@ -212,7 +219,7 @@ func ReadPrivateKey(fn string, pw string) (*PrivateKey, error) {
     ck := hh.Sum(nil)
 
     if subtle.ConstantTimeCompare(esk.Verify, ck) != 1 {
-        return nil, fmt.Errorf("incorrect password for %s", fn)
+        return nil, fmt.Errorf("incorrect password private key")
     }
 
     // Everything works. Now, decode the key
@@ -258,6 +265,10 @@ func (sk *PrivateKey) serialize(fn, comment string, pw string) error {
     hh.Write(esk.Salt)
     hh.Write(xork)
     esk.Verify = hh.Sum(nil)
+
+    // We won't protect the Scrypt parameters with the hash above
+    // because it is not needed. If the parameters are wrong, the
+    // derived key will be wrong and thus, the hash will not match.
 
     esk.Algo = sk_algo     // global var
 
@@ -402,17 +413,25 @@ func ReadPublicKey(fn string) (*PublicKey, error) {
 
     if yml, err = ioutil.ReadFile(fn); err != nil { return nil, err }
 
+    return MakePublicKey(yml)
+}
+
+
+// Parse a serialized public in 'yml' and return the resulting
+// public key instance
+func MakePublicKey(yml []byte) (*PublicKey, error) {
     var spk serializedPubKey
+    var err error
 
     if err = yaml.Unmarshal(yml, &spk); err != nil {
-        return nil, fmt.Errorf("can't parse YAML in %s: %s", fn, err)
+        return nil, fmt.Errorf("can't parse YAML: %s", err)
     }
 
     pk  := &PublicKey{}
     b64 := base64.StdEncoding.DecodeString
 
     if pk.Pk, err = b64(spk.Pk); err != nil {
-        return nil, fmt.Errorf("can't decode YAML:Pk in %s: %s", fn, err)
+        return nil, fmt.Errorf("can't decode YAML:Pk: %s", err)
     }
 
     // Simple sanity checks
