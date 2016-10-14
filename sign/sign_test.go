@@ -11,7 +11,7 @@
 // warranty; it is provided "as is". No claim  is made to its
 // suitability for any purpose.
 
-package sign_test
+package sign
 
 import (
     "os"
@@ -23,7 +23,7 @@ import (
     "crypto/subtle"
 
     // module under test
-    "sign"
+    //"github.com/sign"
 )
 
 
@@ -87,7 +87,7 @@ p: 1
 
 // #1. Create new key pair, and read them back.
 func Test0(t *testing.T) {
-    kp, err := sign.NewKeypair()
+    kp, err := NewKeypair()
     assert(err == nil, t, "NewKeyPair() fail")
 
     dn := tempdir(t)
@@ -104,31 +104,31 @@ func Test0(t *testing.T) {
     assert(fileExists(skf), t, "missing skf")
 
     // send wrong file and see what happens
-    pk, err := sign.ReadPublicKey(skf)
+    pk, err := ReadPublicKey(skf)
     assert(err != nil, t, "bad PK ReadPK fail")
 
-    pk, err = sign.ReadPublicKey(pkf)
+    pk, err = ReadPublicKey(pkf)
     assert(err == nil, t, "ReadPK() fail")
 
     // -ditto- for Sk
-    sk, err := sign.ReadPrivateKey(pkf, "")
+    sk, err := ReadPrivateKey(pkf, "")
     assert(err != nil, t, "bad SK ReadSK fail")
 
-    sk, err = sign.ReadPrivateKey(skf, "")
+    sk, err = ReadPrivateKey(skf, "")
     assert(err != nil, t, "ReadSK() empty pw fail")
 
-    sk, err  = sign.ReadPrivateKey(skf, "abcdef")
+    sk, err  = ReadPrivateKey(skf, "abcdef")
     assert(err != nil, t, "ReadSK() wrong pw fail")
 
     badf := fmt.Sprintf("%s/badf.key", dn)
     err   = ioutil.WriteFile(badf, []byte(badsk), 0600)
     assert(err == nil, t, "write badsk")
 
-    sk, err = sign.ReadPrivateKey(badf, "abc")
+    sk, err = ReadPrivateKey(badf, "abc")
     assert(err != nil, t, "badsk read fail")
 
     // Finally, with correct password it should work.
-    sk, err  = sign.ReadPrivateKey(skf, "abc")
+    sk, err  = ReadPrivateKey(skf, "abc")
     assert(err == nil, t, "ReadSK() correct pw fail")
 
     // And, deserialized keys should be identical
@@ -141,7 +141,7 @@ func Test0(t *testing.T) {
 
 // #2. Create new key pair, sign a rand buffer and verify
 func Test1(t *testing.T) {
-    kp, err := sign.NewKeypair()
+    kp, err := NewKeypair()
     assert(err == nil, t, "NewKeyPair() fail")
 
     var ck [64]byte        // simulates sha512 sum
@@ -180,10 +180,10 @@ func Test1(t *testing.T) {
     assert(err == nil, t, "keyPair.Serialize() fail")
 
     // Now read the private key and sign
-    sk, err = sign.ReadPrivateKey(skf, "")
+    sk, err = ReadPrivateKey(skf, "")
     assert(err == nil, t, "readSK fail")
 
-    pk, err = sign.ReadPublicKey(pkf)
+    pk, err = ReadPublicKey(pkf)
     assert(err == nil, t, "ReadPK fail")
 
     var buf [8192]byte
@@ -217,7 +217,7 @@ func Test1(t *testing.T) {
     assert(err == nil, t, "sig serialize fail")
 
 
-    s2, err := sign.ReadSignature(sf)
+    s2, err := ReadSignature(sf)
     assert(err == nil, t, "file.sig read fail")
     assert(s2  != nil, t, "file.sig sig nil")
 

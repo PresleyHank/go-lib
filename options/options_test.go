@@ -53,11 +53,11 @@ func TestParse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if opts.Get("root") != "hello" {
+    if v, ok := opts.Get("root"); ok && v != "hello" {
 		t.Error("--root != hello")
 	}
 
-	if opts.Get("verbose") != "true" {
+    if v, ok := opts.Get("verbose"); ok && v != "true" {
 		t.Error("--verbose != true")
 	}
 
@@ -96,7 +96,8 @@ func ExampleParse() {
 		spec.PrintUsageWithError(err)
 	}
 
-	fmt.Printf("required: %s", opts.Get("required"))
+    v, _ := opts.Get("required")
+	fmt.Printf("required: %s", v)
 
 	// Output:
 	// required: hello world
@@ -124,11 +125,12 @@ func TestDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if opts.Get("root") != "XYZ" {
+    if v, ok := opts.Get("root"); ok && v != "XYZ" {
 		t.Error("--root != XYZ")
 	}
-	if opts.GetInt("num") != 2 {
-		t.Error("--num != 2")
+
+    if v, ok := opts.GetInt("num"); ok && v != 2 {
+		t.Errorf("--num != 2; saw %v", v)
 	}
 
 	opts, err = spec.Interpret([]string{"haraway", "-r", "hello", "-n=5"}, []string{})
@@ -137,10 +139,11 @@ func TestDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if opts.Get("root") != "hello" {
+    if v, ok := opts.Get("root"); ok && v != "hello" {
 		t.Error("--root != hello")
 	}
-	if opts.GetInt("num") != 5 {
+
+    if v, ok := opts.GetInt("num"); ok && v != 5 {
 		t.Error("-n != 5")
 	}
 }

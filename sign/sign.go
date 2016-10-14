@@ -595,3 +595,4 @@ func fileCksum(fn string, h hash.Hash) ([]byte, error) {
 }
 
 // EOF
+// vim: ft=go:sw=4:ts=4:tw=78:expandtab:

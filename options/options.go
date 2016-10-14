@@ -1,4 +1,36 @@
-// Self documenting CLI options parser for Go
+// options.go - Self documenting CLI options parser for Go
+//
+// Copyright (c) 2012 Simon Menke <simon.menke@gmail.com>
+// Changes/Enhancements Copyright (c) 2015-2016 Sudhi Herle <sudhi@herle.net>
+//
+// This software does not come with any express or implied
+// warranty; it is provided "as is". No claim  is made to its
+// suitability for any purpose.
+
+
+// Package options implements a self-documenting command line
+// options parsing framework.
+//
+// The list of options a program wishes to use is specified as a
+// lengthy, multi-line string. This string also serves as the
+// help-string for the options.
+//
+// Here is an example option specification:
+//
+//     usage: example-tool
+//     A short description of the command
+//     --
+//     flag        --flag,-f,FLAG           A description for this flag
+//     option=     --option=,-o=,OPTION=    A description for this option
+//                                          the description continues here
+//     !required=  --required,-r=,REQUIRED= A required option
+//     --
+//     env_var=    ENV_VAR=                 An environment variable
+//     --
+//     help        help,h                   Show this help message
+//     run         run                      Run some function
+//     --
+//     Additional help for options or defaults etc. go here.
 package options
 
 import (
@@ -8,6 +40,8 @@ import (
 	"strings"
 )
 
+
+// Representation of a parsed option specification.
 type Spec struct {
 	usage string
 
@@ -21,6 +55,8 @@ type Spec struct {
 	commands    map[string]string
 }
 
+// Representation of parsed command line arguments according to a
+// given option specification
 type Options struct {
 	options  map[string]string
 	defaults map[string]string
@@ -28,16 +64,7 @@ type Options struct {
 	Args     []string
 }
 
-// MustParse() is a wrapper for Parse() for assigning global variables.
-// When an error occures this function will panic.
-func MustParse(spec_string string) *Spec {
-	spec, err := Parse(spec_string)
-	if err != nil {
-		panic(err)
-	}
 
-	return spec
-}
 
 // Parse a spec string and return a Spec object.
 //
@@ -291,9 +318,15 @@ func Parse(desc string) (spec *Spec, err error) {
 
 	spec.usage = strings.Join(lines, "\n") + "\n"
 	spec.usage = strings.Trim(spec.usage, " \t\n")
+    //fmt.Printf("Parsed data:\n%+v\n", spec)
 	return
 }
 
+
+
+// Parse the command line arguments in 'args' and the environment
+// variables in 'environ'. This expects the parsing to succeed and
+// exits with usage string and error if the parsing fails.
 func (this *Spec) MustInterpret(args []string, environ []string) *Options {
 	opts, err := this.Interpret(args, environ)
 	if err != nil {
@@ -303,6 +336,10 @@ func (this *Spec) MustInterpret(args []string, environ []string) *Options {
 	return opts
 }
 
+
+// Parse the command line arguments in 'args' and the environment
+// variables in 'environ'. Return the resulting, parsed options in
+// 'o' and any error in 'err'.
 func (spec *Spec) Interpret(args []string, environ []string) (o *Options, err error) {
 	opts := new(Options)
 	opts.options = make(map[string]string, 0)
@@ -404,39 +441,88 @@ func (spec *Spec) Interpret(args []string, environ []string) (o *Options, err er
 	return
 }
 
+
+// Print the usage string to STDOUT
 func (spec *Spec) PrintUsage() {
-	fmt.Fprintf(os.Stderr, "%s\n", spec.usage)
+	fmt.Fprintf(os.Stdout, "%s\n", spec.usage)
 }
 
+
+// Print the usage string to STDOUT and exit with a non-zero code.
 func (spec *Spec) PrintUsageAndExit() {
 	spec.PrintUsage()
-	os.Exit(62)
+	os.Exit(1)
 }
 
+
+// Print the error string corresponding to 'err' and then show the
+// usage string. Both are sent to STDERR. Exit with a non-zero code.
 func (spec *Spec) PrintUsageWithError(err error) {
 	fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, spec.usage)
-	os.Exit(62)
+	os.Exit(1)
 }
 
-func (opts *Options) Get(option string) (string, bool) {
-	if value, present := opts.options[option]; present {
-		return value, present
+
+// Return the option corresponding to 'nm'. If the option is not set
+// (provided on the command line), the bool retval will be False.
+func (opts *Options) Get(nm string) (string, bool) {
+    if v, ok := opts.options[nm]; ok {
+		return v, true
 	}
-	return opts.defaults[option], false
+
+    if v, ok := opts.defaults[nm]; ok {
+        return v, true
+    }
+
+	return "", false
 }
 
-func (opts *Options) GetBool(option string) bool {
-    v, ok := opts.options[option]
-    if ok && v == "true" { return true }
+
+// Interpret the option corresponding to the key 'nm' as
+// a Bool and parse it. A failed parse defaults to False.
+func (opts *Options) GetBool(nm string) bool {
+    if v, ok := opts.Get(nm); ok {
+        switch strings.ToLower(v) {
+            case "true", "ok", "1", "yes", "on":
+                return true
+
+            default:
+                return false
+        }
+    }
 
     return false
 }
 
-func (opts *Options) GetInt(option string) int {
-    v, ok := opts.options[option]
-    if ok {
-        i, _ := strconv.Atoi(v)
-        return i
+
+// Interpret the option corresponding to the key 'nm' as a signed
+// integer (auto-detected base). The second retval will be false if
+// the parse fails or the key is not found.
+func (opts *Options) GetInt(nm string) (int64, bool) {
+    if v, ok := opts.Get(nm); ok {
+        if i, err := strconv.ParseInt(v, 0, 64); err == nil { return i, true }
     }
-	return 0
+	return 0, false
 }
+
+
+// Interpret the option corresponding to the key 'nm' as an unsigned
+// integer (auto-detected base). The second retval will be false if
+// the parse fails or the key is not found.
+func (opts *Options) GetUint(nm string) (uint64, bool) {
+    if v, ok := opts.Get(nm); ok {
+        if i, err := strconv.ParseUint(v, 0, 64); err == nil { return i, true }
+    }
+	return 0, false
+}
+
+
+// Return true if the option with the key 'nm' is set (i.e., provided
+// on the command line).
+func (opts *Options) IsSet(nm string) bool {
+    _, ok := opts.options[nm]
+    return ok
+}
+
+
+// vim: ft=go:sw=4:ts=4:tw=78:expandtab:
