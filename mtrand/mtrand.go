@@ -10,14 +10,15 @@
 // This software does not come with any express or implied
 // warranty; it is provided "as is". No claim  is made to its
 // suitability for any purpose.
+
+// Package mtrand is a Mersenne-Twister implementation (MT19937) for 32-bit
+// output.
 //
 // Notes:
 // ======
 // o 32-bit Mersenne-Twister MT19937
 // o Not safe for calling from multiple goroutines
 // o Ref: https://en.wikipedia.org/wiki/Mersenne_Twister
-//
-
 package mtrand  // github.com/opencoff/go-lib/mtrand
 
 import (

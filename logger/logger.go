@@ -12,10 +12,15 @@
 // of each logged message.
 // The Fatal functions call os.Exit(1) after writing the log message.
 // The Panic functions call panic after writing the log message.
+
+// Package Logger is an enhanced derivative of the Golang 'log'
+// package.
 //
-// ---------- Enhancements done by Sudhi Herle ------------
+// The list of enhancements are:
 //
-// Additional functionality compared to the log package:
+// - All I/O is done in an asynchronous go-routine; thus, the caller
+//   does not incur any overhead beyond the formatting of the
+//   strings.
 //
 // - Log levels define a heirarchy; an instance of a logger is
 //   configured with a given log level; and it only prints log
@@ -50,7 +55,6 @@
 //   different modules.
 //
 // - Log rotation based on daily ToD (configurable)
-
 package logger
 
 import (
