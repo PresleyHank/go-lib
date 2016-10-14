@@ -15,10 +15,9 @@
 // output.
 //
 // Notes:
-// ======
-// o 32-bit Mersenne-Twister MT19937
-// o Not safe for calling from multiple goroutines
-// o Ref: https://en.wikipedia.org/wiki/Mersenne_Twister
+// * 32-bit Mersenne-Twister MT19937
+// * Not safe for calling from multiple goroutines
+// * Ref: https://en.wikipedia.org/wiki/Mersenne_Twister
 package mtrand  // github.com/opencoff/go-lib/mtrand
 
 import (

@@ -12,6 +12,7 @@
 // suitability for any purpose.
 
 // Package ringbuf implements a blocking packet-buffer backed by a channel.
+//
 // This allows a ringbuf instance to be naturally race-free and
 // thread-safe. Each packet-buffer is pre-allocated and stored in a
 // buffered channel. The default size of the packet-buf is BUFSIZE
