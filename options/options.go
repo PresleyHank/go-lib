@@ -67,23 +67,6 @@ type Options struct {
 
 
 // Parse a spec string and return a Spec object.
-//
-// The spec string must have the following format:
-//
-//     usage: example-tool
-//     A short description of the command
-//     --
-//     flag        --flag,-f,FLAG           A description for this flag
-//     option=     --option=,-o=,OPTION=    A description for this option
-//                                          the description continues here
-//     !required=  --required,-r=,REQUIRED= A required option
-//     --
-//     env_var=    ENV_VAR=                 An environment variable
-//     --
-//     help        help,h                   Show this help message
-//     run         run                      Run some function
-//     --
-//     More freestyle text
 func Parse(desc string) (spec *Spec, err error) {
 	spec = new(Spec)
 	spec.options = make(map[string]string, 0)
