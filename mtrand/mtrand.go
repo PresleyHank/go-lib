@@ -11,6 +11,7 @@
 // warranty; it is provided "as is". No claim  is made to its
 // suitability for any purpose.
 
+
 // Package mtrand is a Mersenne-Twister implementation (MT19937) for 32-bit
 // output.
 //
