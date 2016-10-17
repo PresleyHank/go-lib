@@ -66,7 +66,7 @@ type Options struct {
 
 
 
-// Parse a spec string and return a Spec object.
+// Parse a spec string and return a Spec object 
 func Parse(desc string) (spec *Spec, err error) {
 	spec = new(Spec)
 	spec.options = make(map[string]string, 0)
@@ -303,6 +303,20 @@ func Parse(desc string) (spec *Spec, err error) {
 	spec.usage = strings.Trim(spec.usage, " \t\n")
     //fmt.Printf("Parsed data:\n%+v\n", spec)
 	return
+}
+
+
+// Parse a spec string and die if it fails
+func MustParse(desc string) *Spec {
+    var p *Spec
+    var err error
+
+    if p, err = Parse(desc); err != nil {
+        fmt.Fprintf(os.Stderr, "Spec parse error for\n'%.80s' ..\n%s\n", desc, err);
+        os.Exit(1);
+    }
+
+    return p;
 }
 
 
