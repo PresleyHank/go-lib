@@ -161,7 +161,7 @@ func Parse(desc string) (spec *Spec, err error) {
 			if strings.Contains(option, "=") {
 				ks := strings.Split(option, "=")
 				option = ks[0]
-				spec.defaults[option] = ks[1]
+                if defval := ks[1]; len(defval) > 0 { spec.defaults[option] = defval }
 				flag = false
 			}
 
