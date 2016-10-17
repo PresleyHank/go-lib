@@ -55,7 +55,7 @@ func NewRing(nbufs, bufsize int) *Ring {
 
     r.q = make(chan *PacketBuf, nbufs)
 
-    for ;n > 0; n -= 1 {
+    for ;nbufs > 0; nbufs -= 1 {
         u := &PacketBuf{r: r}
         u.buf  = make([]byte, bufsize)
         u.Data = u.buf[:]
