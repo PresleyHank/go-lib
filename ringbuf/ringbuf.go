@@ -49,11 +49,11 @@ type Ring struct {
 // packet-buffer is 'bufsize' in size. if 'bufsize' is zero, it
 // defaults to BUFSIZE bytes.
 func NewRing(nbufs, bufsize int) *Ring {
-    r := &Ring{Size: n}
+    r := &Ring{Size: nbufs}
 
     if bufsize <= 0 { bufsize = BUFSIZE }
 
-    r.q = make(chan *PacketBuf, n)
+    r.q = make(chan *PacketBuf, nbufs)
 
     for ;n > 0; n -= 1 {
         u := &PacketBuf{r: r}
