@@ -29,6 +29,36 @@ func TestNew(t *testing.T) {
 	}
 }
 
+
+func TestMulti(t *testing.T) {
+	spec, err := Parse(`
+    usage: multi <flags>... <command> <args>...
+    --
+    #         Options
+    include=, -I,--include=,    Add dir to include search path
+    exclude=, -X,--exclude=     Add dir to exclude search path
+    --
+    --
+    --
+    `)
+
+    if err != nil { t.Error(err) }
+
+    argv := []string{"multi", "-I", "/usr/local", "--include=/usr/include", "-I=/foo"}
+	oo, err := spec.Interpret(argv, []string{})
+    if err != nil { t.Error(err) }
+
+    z, ok := oo.Get("include")
+    if !ok { t.Error("expected to find at least one -I; found none!") }
+
+    if z != "/usr/local" { t.Errorf("expected to see /usr/local, saw %s", z) }
+
+    zv := oo.GetMulti("include")
+    if len(zv) != 3 { t.Errorf("expected to see 3 entries, saw %d", len(zv)) }
+}
+
+
+
 func TestParse(t *testing.T) {
 	spec, err := Parse(`
     usage: haraway <flags>... <command> <args>...

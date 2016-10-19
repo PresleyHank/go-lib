@@ -59,6 +59,11 @@ type Spec struct {
 // given option specification
 type Options struct {
 	options  map[string]string
+
+    // If the options are repeated on the command line, second and subsequent
+    // values are in optionv
+    optionv  map[string][]string
+
 	defaults map[string]string
 	Command  string
 	Args     []string
@@ -340,6 +345,7 @@ func (this *Spec) MustInterpret(args []string, environ []string) *Options {
 func (spec *Spec) Interpret(args []string, environ []string) (o *Options, err error) {
 	opts := new(Options)
 	opts.options = make(map[string]string, 0)
+	opts.optionv = make(map[string][]string, 0)
 	opts.defaults = spec.defaults
 	opts.Args = []string{}
 
@@ -401,7 +407,12 @@ func (spec *Spec) Interpret(args []string, environ []string) (o *Options, err er
 				}
 			}
 
-			opts.options[option] = value
+            // second and subsequent options go in optionv
+            if _, ok := opts.options[option]; ok {
+                opts.optionv[option] = append(opts.optionv[option], value)
+            } else {
+                opts.options[option] = value
+            }
 			continue
 		}
 
@@ -472,6 +483,20 @@ func (opts *Options) Get(nm string) (string, bool) {
     }
 
 	return "", false
+}
+
+// For options that are providd multiple times, return all of them in a
+// slice. A nil slice implies the option was not set on the command line.
+func (opts *Options) GetMulti(nm string) []string {
+    var rv []string
+    var v string
+    var ok bool
+
+    if v, ok = opts.options[nm]; !ok { return nil }
+
+    rv = append(rv, v)
+    rv = append(rv, opts.optionv[nm]...)
+    return rv
 }
 
 
