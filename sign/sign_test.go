@@ -158,6 +158,10 @@ func Test1(t *testing.T) {
     // verify sig
     assert(ss.IsPKMatch(pk), t, "pk match fail")
 
+    // Corrupt the pkhash and see
+    rand.Read(ss.Pkhash[:])
+    assert(!ss.IsPKMatch(pk), t, "corrupt pk match fail")
+
     // Incorrect checksum == should fail verification
     ok, err := pk.VerifyMessage(ck[:16], ss)
     assert(err == nil, t, "bad ck verify err fail")
