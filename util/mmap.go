@@ -22,8 +22,8 @@ import (
 )
 
 
-// A mmap'd file reader that processes the file in large chunks. The
-// default chunk-size is 1GB (1024 x 1024 x 1024 bytes).
+// A mmap'd file reader that processes an already pen file in large chunks.
+// The default chunk-size is 1GB (1024 x 1024 x 1024 bytes).
 //
 // This function can be used to efficiently hash very large files:
 //

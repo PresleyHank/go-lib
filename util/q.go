@@ -14,7 +14,7 @@ import (
     "sync"
 )
 
-// Thread-safe, fixed-size circular queue
+// Thread-safe, fixed-size circular queue.
 // Stores interface{} in each queue slot.
 //
 // Notes:
@@ -44,8 +44,9 @@ func nextpow2(n uint) uint {
 }
 
 
-// Make a new Queue instance to hold (at least) 'n' slots. This
-// function will pick the next closest power-of-2 of 'n'.
+// Make a new Queue instance to hold (at least) 'n' slots. If 'n' is
+// NOT a power-of-2, this function will pick the next closest
+// power-of-2.
 func NewQ(n int) *Q {
     w     := &Q{}
     w.mask = nextpow2(uint(n)) - 1

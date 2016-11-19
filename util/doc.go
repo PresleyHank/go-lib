@@ -7,9 +7,8 @@
 
 // Package util implements convenience functions that are reusable
 // across projects:
-//
-// - Thread-safe, fixed-size circular queue
-// - Random UUIDv4 generator
-// - Read and process (very large) files in mmap(2) mode
-// - Channel backed, fixed size buffer pool
+// * Thread-safe, fixed-size circular queue
+// * Random UUIDv4 generator
+// * Read and process (very large) files in mmap(2) mode
+// * Channel backed, fixed size buffer pool
 package util
