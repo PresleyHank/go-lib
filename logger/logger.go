@@ -10,43 +10,52 @@
 //
 // The list of enhancements are:
 //
-// - All I/O is done in an asynchronous go-routine; thus, the caller
-//   does not incur any overhead beyond the formatting of the
-//   strings.
+//  - All I/O is done in an asynchronous go-routine; thus, the caller
+//    does not incur any overhead beyond the formatting of the
+//    strings.
 //
-// - Log levels define a heirarchy; an instance of a logger is
-//   configured with a given log level; and it only prints log
-//   messages "above" the configured level. e.g., if a logger is
-//   configured with level of INFO, then it will print all log
-//   messages with INFO and higher priority; in particular, it won't
-//   print DEBUG messages.
+//  - Log levels define a heirarchy (from most-verbose to
+//    least-verbose):
+//      LOG_DEBUG
+//      LOG_INFO
+//      LOG_WARNING
+//      LOG_ERR
+//      LOG_CRIT
+//      LOG_EMERG
+//  
+//  - An instance of a logger is configured with a given log level;
+//    and it only prints log messages "above" the configured level.
+//    e.g., if a logger is configured with level of INFO, then it will
+//    print all log messages with INFO and higher priority;
+//    in particular, it won't print DEBUG messages.
 //
-// - A single program can have multiple loggers each with a
-//   different priority
+//  - A single program can have multiple loggers; each with a
+//    different priority.
 //
-// - The logger method Backtrace() will print a stack backtrace to
-//   the configured output stream. Log levels are NOT
-//   considered when backtraces are printed.
+//  - The logger method Backtrace() will print a stack backtrace to
+//    the configured output stream. Log levels are NOT
+//    considered when backtraces are printed.
 //
-// - The Panic() and Fatal() logger methods implicitly print the
-//   stack backtrace (upto 5 levels).
+//  - The Panic() and Fatal() logger methods implicitly print the
+//    stack backtrace (upto 5 levels).
 //
-// - DEBUG, ERR, CRIT log outputs (via Debug(), Err() and Crit()
-//   methods) also print the source file location from whence they
-//   were invoked.
+//  - DEBUG, ERR, CRIT log outputs (via Debug(), Err() and Crit()
+//    methods) also print the source file location from whence they
+//    were invoked.
 //
-// - New package functions to create a syslog(1) or a file logger
-//   instance.
+//  - New package functions to create a syslog(1) or a file logger
+//    instance.
 //
-// - Callers can create a new logger instance if they have an
-//   io.writer instance of their own - in case the existing output
-//   streams (File and Syslog) are insufficient.
+//  - Callers can create a new logger instance if they have an
+//    io.writer instance of their own - in case the existing output
+//    streams (File and Syslog) are insufficient.
 //
-// - Create child-loggers with a different priority and prefix (but
-//   same destination); this is useful in large programs with
-//   different modules.
+//  - Any logger instance can create child-loggers with a different
+//    priority and prefix (but same destination); this is useful in large
+//    programs with different modules.
 //
-// - Log rotation based on daily ToD (configurable)
+//  - Compressed log rotation based on daily ToD (configurable ToD) -- only
+//    available for file-backed destinations.
 package logger
 
 import (
@@ -87,19 +96,24 @@ const (
     LstdFlags     = Ldate | Ltime // initial values for the standard logger
 )
 
-// Log priority. These form a heirarchy.
+// Log priority. These form a heirarchy:
+//
+//   LOG_DEBUG
+//   LOG_INFO
+//   LOG_WARNING
+//   LOG_ERR
+//   LOG_CRIT
+//   LOG_EMERG
+//
 // An instance of a logger is configured with a given log level;
 // and it only prints log messages "above" the configured level.
-// e.g.,
-//    if a logger is configured with level of INFO, then it
-//    will print all log messages with INFO and higher priority;
-//    in particular, it won't print DEBUG messages.
 type Priority int
 
 
 // Maximum number of daily logs we will store
 const MAX_LOGFILES = 7
 
+// Log Priorities
 const (
     LOG_NONE Priority = iota
     LOG_DEBUG
@@ -136,6 +150,7 @@ var PrioName = map[string]Priority {
 }
 
 
+// Map log priorities to their string names
 var PrioString = map[Priority]string {
     LOG_DEBUG: "DEBUG",
     LOG_INFO:  "INFO",
@@ -157,7 +172,7 @@ type outch struct {
 // A Logger represents an active logging object that generates lines of
 // output to an io.Writer.  Each logging operation makes a single call to
 // the Writer's Write method.  A Logger can be used simultaneously from
-// multiple goroutines; it guarantees to serialize access to the Writer.
+// multiple goroutines; it guarantees serialized access to the Writer.
 type Logger struct {
     mu     sync.Mutex       // ensures atomic changes to properties
     prio   Priority         // Logging priority
@@ -206,7 +221,7 @@ func (l *Logger) Close() {
 }
 
 
-// New creates a new Logger.   The out variable sets the
+// Creates a new Logger instance. The 'out' variable sets the
 // destination to which log data will be written.
 // The prefix appears at the beginning of each generated log line.
 // The flag argument defines the logging properties.
@@ -215,7 +230,7 @@ func New(out io.Writer, prio Priority, prefix string, flag int) (*Logger, error)
 }
 
 
-// Create a new Sub-Logger with a different prefix and priority
+// Create a new Sub-Logger with a different prefix and priority.
 // This is useful when different components in a large program want
 // their own log-prefix (for easier debugging)
 func (l *Logger) New(prefix string, prio Priority) *Logger {
@@ -241,7 +256,8 @@ func (l *Logger) New(prefix string, prio Priority) *Logger {
 
 
 // Open a new file logger to write logs to 'file'.
-// This function erases the previous file contents.
+// This function erases the previous file contents. This is the only
+// constructor that allows you to subsequently configure a log-rotator.
 func NewFilelog(file string, prio Priority, prefix string, flag int) (*Logger, error) {
     flag &= ^(lSyslog|lPrefix|lClose)
 
@@ -259,7 +275,7 @@ func NewFilelog(file string, prio Priority, prefix string, flag int) (*Logger, e
 }
 
 
-// Open a new syslog logger
+// Open a new syslog logger.
 // XXX What happens on Win32?
 func NewSyslog(prio Priority, prefix string, flag int) (*Logger, error) {
     flag &= ^(lSyslog|lPrefix|lClose)
@@ -294,7 +310,9 @@ func NewLogger(name string, prio Priority, prefix string, flag int) (*Logger, er
 }
 
 
-// Enable log rotation
+// Enable log rotation to happen every day at 'hh:mm:ss' (24-hour
+// representation); keep upto 'max' previous logs. Rotated logs are
+// gzip-compressed.
 func (l *Logger) EnableRotation(hh, mm, ss int, max int) error {
     l.mu.Lock()
     defer l.mu.Unlock()
