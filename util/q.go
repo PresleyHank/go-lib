@@ -3,13 +3,10 @@
 // (c) 2014 Sudhi Herle <sw-at-herle.net>
 //
 // Placed in the Public Domain
-//
-// Notes:
-//  - thread safe (uses mutex)
-//  - for a queue of capacity N, it will store N-1 usable elements
-//  - Queue-Empty: rd == wr
-//  - Queue-Full:  wr+1 == rd
-//  - read from 'rd', write to 'wr+1'.
+// This software does not come with any express or implied
+// warranty; it is provided "as is". No claim  is made to its
+// suitability for any purpose.
+
 package util
 
 import (
@@ -17,7 +14,15 @@ import (
     "sync"
 )
 
-
+// Thread-safe, fixed-size circular queue
+// Stores interface{} in each queue slot.
+//
+// Notes:
+//  - read from 'rd', write to 'wr+1'.
+//  - queue size always a power-of-2
+//  - for a queue of capacity N, it will store N-1 usable elements
+//  - queue-empty: rd   == wr
+//  - queue-full:  wr+1 == rd
 type Q struct {
     q []interface{}
     wr, rd  uint
@@ -39,6 +44,8 @@ func nextpow2(n uint) uint {
 }
 
 
+// Make a new Queue instance to hold (at least) 'n' slots. This
+// function will pick the next closest power-of-2 of 'n'.
 func NewQ(n int) *Q {
     w     := &Q{}
     w.mask = nextpow2(uint(n)) - 1
@@ -136,7 +143,6 @@ func (w *Q) size() int {
         return int((w.mask+1) - w.rd + w.wr)
     }
 }
-
 
 
 // EOF

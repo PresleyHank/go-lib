@@ -13,7 +13,7 @@ import (
     "encoding/hex"
 )
 
-
+// UUID abstraction
 type UUID struct {
     b [16]byte
 }
@@ -32,7 +32,7 @@ func NewUUID() *UUID {
     return u
 }
 
-// Make UUID from a stored byte stream
+// Make UUID from a raw byte stream.
 func MakeUUID(b []byte) *UUID {
     if len(b) != 16 { return nil }
 
@@ -69,4 +69,4 @@ func (u *UUID) String() string {
     return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
-
+// EOF

@@ -13,15 +13,15 @@
 
 package util
 
-// Default pool size
-const Poolsize = 64
-
-
+// A fixed-size buffer-pool backed by a channel. Callers are
+// expected to free the buffer back to its originating pool.
 type Bufpool struct {
     Size int
     q    chan interface{}
 }
 
+// Default pool size
+const Poolsize = 64
 
 func NewBufpool(sz int) *Bufpool {
     if sz <= 0 { sz = Poolsize }
@@ -40,4 +40,4 @@ func (b *Bufpool) Get() interface{} {
     o := <- b.q
     return o
 }
-
+// EOF
