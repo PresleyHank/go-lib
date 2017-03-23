@@ -68,7 +68,7 @@ func MmapReader(fd *os.File, off, sz int64, wr io.Writer) (int64, error) {
         if sz > chunk { n = int(chunk) }
 
         mem, err := syscall.Mmap(int(fd.Fd()), off, n, syscall.PROT_READ, syscall.MAP_SHARED)
-        if err   != nil { return fmt.Errorf("can't mmap %v bytes at %v: %s", n, off, err) }
+        if err   != nil { return 0, fmt.Errorf("can't mmap %v bytes at %v: %s", n, off, err) }
 
         wr.Write(mem)
         syscall.Munmap(mem)

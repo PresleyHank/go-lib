@@ -22,3 +22,25 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+bin/*
+.*.sw?
+.idea
+logs/*
+
+# gg ignores
+vendor/src/*
+vendor/pkg/*
+servers.iml
+*.DS_Store
+
+# vagrant ignores
+tools/vagrant/.vagrant
+tools/vagrant/adsrv-conf/.frontend
+tools/vagrant/adsrv-conf/.bidder
+tools/vagrant/adsrv-conf/.transcoder
+tools/vagrant/redis-cluster-conf/7777/nodes.conf
+tools/vagrant/redis-cluster-conf/7778/nodes.conf
+tools/vagrant/redis-cluster-conf/7779/nodes.conf
+*.aof
+*.rdb
