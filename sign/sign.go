@@ -219,7 +219,7 @@ func MakePrivateKey(yml []byte, pw string) (*PrivateKey, error) {
     ck := hh.Sum(nil)
 
     if subtle.ConstantTimeCompare(esk.Verify, ck) != 1 {
-        return nil, fmt.Errorf("incorrect password private key")
+        return nil, fmt.Errorf("incorrect private key password")
     }
 
     // Everything works. Now, decode the key
