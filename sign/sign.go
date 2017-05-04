@@ -25,18 +25,19 @@ import (
     "fmt"
     "hash"
     "crypto"
-    "syscall"
     "io/ioutil"
     "crypto/rand"
     "crypto/subtle"
     "crypto/sha256"
     "crypto/sha512"
     "encoding/base64"
+    "encoding/binary"
 
     "gopkg.in/yaml.v2"
     "golang.org/x/crypto/scrypt"
     Ed "golang.org/x/crypto/ed25519"
-    "golang.org/x/crypto/ssh/terminal"
+
+    "github.com/opencoff/go-lib/util"
 )
 
 
@@ -139,7 +140,6 @@ func NewKeypair() (*Keypair, error) {
     sk := &kp.Sec
     pk := &kp.Pub
 
-    // Fuck. Why can't they use simple types!
     p, s, err := Ed.GenerateKey(rand.Reader)
     if err != nil { return nil, fmt.Errorf("Can't generate Ed25519 keys: %s", err) }
 
@@ -481,33 +481,6 @@ func (pk *PublicKey) VerifyMessage(ck []byte, sig *Signature) (bool, error) {
 
 
 
-// Utility function: Ask user for an interactive password
-// If verify is true, confirm a second time.
-// Mistakes during confirmation cause the process to restart upto a
-// maximum of 2 times.
-func Askpass(prompt string, verify bool) (string, error) {
-
-    for i := 0; i < 2; i++ {
-        fmt.Printf("%s: ", prompt)
-        pw1, err := terminal.ReadPassword(int(syscall.Stdin))
-        fmt.Printf("\n")
-        if err != nil { return "", err }
-        if !verify { return string(pw1), nil }
-
-        fmt.Printf("%s again: ", prompt)
-        pw2, err := terminal.ReadPassword(int(syscall.Stdin))
-        fmt.Printf("\n")
-        if err != nil { return "", err }
-
-        a := string(pw1)
-        b := string(pw2)
-        if a == b { return a, nil }
-    }
-
-    return "", fmt.Errorf("Too many tries getting password")
-}
-
-
 // -- Internal Utility Functions --
 
 // Unlink a file.
@@ -519,11 +492,6 @@ func unlink(f string) {
         os.Remove(f)
         return
     }
-
-    // XXX Go has no easy way to do os.file.isexist() ala python; it has
-    //     a confusing fuktard full of err checks all over the place.
-    //     Here, err != nil. But, I have no way of knowing if it is
-    //     becasue of ENOENT or some other error.
 }
 
 
@@ -553,45 +521,21 @@ func writeFile(fn string, b []byte, mode uint32) error {
 
 
 // Generate file checksum out of hash function h
-// Use mmap(2) to read the file in chunks.
-// Here, we use a 2GB chunk size
 func fileCksum(fn string, h hash.Hash) ([]byte, error) {
+
     fd, err := os.Open(fn)
     if err != nil { return nil, fmt.Errorf("can't open %s: %s", fn, err) }
     
     defer fd.Close()
 
-    st, err := fd.Stat()
-    if err != nil { return nil, fmt.Errorf("can't stat %s: %s", fn, err) }
+    sz, err := util.MmapReader(fd, 0, 0, h)
+    if err  != nil { return nil, err }
 
-    // Mmap'ing large files won't work. We need to do it in 1 or 2G
-    // chunks.
-    const chunk  int64 = 1 * 1024 * 1024 * 1024
+    var b [8]byte
+    binary.BigEndian.PutUint64(b[:], uint64(sz))
+    h.Write(b[:])
 
-    var off int64
-    for sz := st.Size(); sz > 0; {
-        var n int
-
-        // XXX Ternary operator was so bloody unreadable? Fuktards.
-        if sz > chunk {
-            n = int(chunk)
-        } else {
-            n = int(sz)
-        }
-
-        mem, err := syscall.Mmap(int(fd.Fd()), off, n, syscall.PROT_READ, syscall.MAP_SHARED)
-        if err != nil { return nil, fmt.Errorf("can't mmap %v bytes of %s at %v: %s", n, fn, off, err) }
-
-        h.Write(mem)
-        syscall.Munmap(mem)
-
-        sz  -= int64(n)
-        off += int64(n)
-    }
-
-    ck := h.Sum(nil)
-
-    return ck, nil
+    return h.Sum(nil), nil
 }
 
 // EOF
