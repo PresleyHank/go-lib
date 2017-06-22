@@ -29,7 +29,7 @@ type testcase struct {
 }
 
 var tests = [...]testcase{
-    {"123456.987654321", "123456.987654321000", 0},
+    {"123456.987654321", "123456.987654321000", 12},
     {"123456.987654321", "123456.98765", 5},
     {"123456.987654321", "123456.987654", 6},
     {"123.00456000000", "123.00456", 5},
@@ -47,8 +47,8 @@ func Test_fmt(t *testing.T) {
         c, err := currency.NewFromString(tc.in)
         assert(err == nil, t)
 
-        t.Logf("in=|%s|, exp out=|%s|\n", tc.in, tc.out)
         s := c.StringFixed(tc.oprec)
+        t.Logf("in=|%s|, exp out=|%s| => |%s|\n", tc.in, tc.out, s)
         assert(s == tc.out, t)
     }
 }

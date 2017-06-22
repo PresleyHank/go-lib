@@ -13,9 +13,9 @@
 // suitability for any purpose.
 
 // Package currency implements a decimal currency type as
-// "pico dollars" (1.0e-12) represented as a big.Int.
+// "atto dollars" (1.0e-18) represented as a big.Int.
 // All arithmetic is done on the underlying Big.Int. By default, the
-// output conversion to string uses the full (12 decimal digit)
+// output conversion to string uses the full (18 decimal digit)
 // precision. 
 package currency
 
@@ -25,24 +25,42 @@ import (
     "math/big"
 )
 
-// A currency currency is represented as pico dollars
+// A currency is represented as atto dollars (18 digits of precision)
 type Currency struct {
     big.Int
 }
 
-// Pico exponent, multiplication factor and padding string
-const eExp          = 12
-const iMult int64   = 1000000000000
-const zeroes string = "000000000000"
+// Atto exponent, multiplication factor and padding string
+const eExp          = 18
+
+var iMult     int64     // multiplicative factor for 'characteristic'
+var iBigMult *big.Int   // same as iMult, but as a big.Int
+var zeroes    string    // array of zeroes
+var zero     *big.Int   // "zero" currency
 
 
-// Multiplicative factor for the 'characteristic' (before the
-// decimal point)
-var  iBigMult = big.NewInt(iMult)
+func init() {
+    for i := 0; i < eExp; i++ {
+        zeroes += "0"
+    }
 
-// Unity mapping
-var zero = Currency{}
+    iMult    = pow64(10, eExp)
+    iBigMult = big.NewInt(iMult)
+    zero     = big.NewInt(0)
+}
 
+// compute a ** b for unsigned quantities using binary
+// exponentiation method
+func pow64(a int64, b int) int64 {
+    var r int64 = 1
+    for b > 0 {
+        if 0 != (b & 1) { r *= a }
+
+        b >>= 1
+        a  *= a
+    }
+    return r
+}
 
 // Create a zero valued currency 
 func New() *Currency {
@@ -74,7 +92,7 @@ func (p Currency) String() string {
 
 
 // Show 'p' to a string bounded by output precision 'oprec'
-// If 'oprec' is more than the pico-dollar resolution, it is clamped
+// If 'oprec' is more than the atto-dollar resolution, it is clamped
 // at 12.
 func (p *Currency) StringFixed(oprec int) string {
     if oprec > eExp || oprec <= 0 { oprec = eExp }
@@ -83,13 +101,13 @@ func (p *Currency) StringFixed(oprec int) string {
 }
 
 
-// stringify pico-dollars in 'b'
+// stringify atto-dollars in 'b'
 func stringify(b *big.Int, oprec int) string {
     var m, x string
 
     s := b.String()
 
-    // Not enough pico dollars
+    // Not enough atto dollars
     if len(s) <= eExp {
         m = "0"
         if lpad := eExp - len(s); lpad > 0 {
@@ -151,7 +169,7 @@ func (p *Currency) DivMod(x *Currency) (*Currency, *Currency) {
 
 // Return true if this is zero
 func (p *Currency) IsZero() bool {
-    return 0 == p.Cmp(&zero.Int)
+    return 0 == p.Cmp(zero)
 }
 
 
@@ -241,7 +259,7 @@ func (p *Currency) UnmarshalJSON(txt []byte) error {
 }
 
 
-// Parse a valid string 's' into a pico-dollar big.Int
+// Parse a valid string 's' into a atto-dollar big.Int
 func parse(p *big.Int, s string) error {
     v := strings.Split(s, ".")
     var pre, post string
@@ -281,7 +299,7 @@ func parse(p *big.Int, s string) error {
 
     if exp := eExp - n; exp > 0 {
         var m big.Int
-        m.SetInt64(pow(exp))
+        m.SetInt64(pow64(10, exp))
         f.Mul(f, &m)
     }
 
@@ -308,11 +326,3 @@ func zstripPost(s string) string {
     return ""
 }
 
-func pow(e int) int64 {
-    var i int64 = 1
-
-    for ; e > 0; e-- {
-        i *= 10
-    }
-    return i
-}
