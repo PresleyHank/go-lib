@@ -1,4 +1,4 @@
-// currency.go - Pico dollars represented as big.Int
+// currency.go - Atto dollars represented as big.Int
 //
 // (c) 2017, Sudhi Herle <sudhi@herle.net>
 //
@@ -16,7 +16,8 @@
 // "atto dollars" (1.0e-18) represented as a big.Int.
 // All arithmetic is done on the underlying Big.Int. By default, the
 // output conversion to string uses the full (18 decimal digit)
-// precision. 
+// precision. Output string representation is not rounded - but
+// truncated.
 package currency
 
 import (
@@ -69,8 +70,8 @@ func New() *Currency {
 
 
 // Make a new Currency instance with input string 's' and output
-// precision of 'oprec'. If 'oprec' is more than Pico Dollars, it is
-// clamped at Pico Dollars (12). If it is less than or equal to
+// precision of 'oprec'. If 'oprec' is more than Atto Dollars, it is
+// clamped at Atto Dollars (18). If it is less than or equal to
 // zero, it is clamped at 6.
 func NewFromString(s string) (*Currency, error) {
     p := &Currency{}
