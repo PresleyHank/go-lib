@@ -1,4 +1,4 @@
-// sign_test.go -- Test harness for android/pkg
+// sign_test.go -- Test harness for sign
 //
 // (c) 2016 Sudhi Herle <sudhi@herle.net>
 //
