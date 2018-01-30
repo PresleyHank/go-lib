@@ -53,6 +53,10 @@ What Libraries are available?
   called sigtool_  uses this library to provide a replacement for
   OpenBSD's signify(1).
 
+- fileio - open & read gzipped files transparently. Also contains
+  functions for doing "line-at-a-time" I/O - either synchronously or
+  from a chan.
+
 - util - General purpose utility functions that I couldn't fit
   anywhere else.
 
