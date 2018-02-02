@@ -165,6 +165,7 @@ var PrioString = map[Priority]string {
 // abstraction together. There is only ever _one_ instance of this
 // struct in a top-level logger.
 type outch struct {
+    sync.Mutex
     closed uint32           // atomically set/read
     logch  chan string      // buffered channel
 }
@@ -207,15 +208,23 @@ func newLogger(ll *Logger) (*Logger, error) {
     return ll, nil
 }
 
+func (l *Logger) closeCh() (r uint32) {
+    l.ch.Lock()
+    if r = atomic.SwapUint32(&l.ch.closed, 1); r == 0 {
+        close(l.ch.logch)
+    }
+    l.ch.Unlock()
+
+    return r
+}
+
 
 // Close the logger and wait for I/O to complete
 func (l *Logger) Close() {
     if 0 != (l.flag & lSublog) { return }
 
-    if z := atomic.SwapUint32(&l.ch.closed, 1); z == 0 {
+    if z := l.closeCh(); z == 0 {
         //fmt.Printf("## Closing Logger; closed=%v\n", l.ch.closed)
-        time.Sleep(1)
-        close(l.ch.logch)
         _, _ = <- l.wait
     }
 }
@@ -356,6 +365,7 @@ func (l *Logger) EnableRotation(hh, mm, ss int, max int) error {
 }
 
 
+
 // Cheap integer to fixed-width decimal ASCII.  Give a negative width to avoid zero-padding.
 // Knows the buffer has capacity.
 func itoa(i int, wid int) string {
@@ -466,22 +476,36 @@ func (l *Logger) ofmt(calldepth int, prio Priority, s string) string {
 }
 
 
+// Enqueue a write to be flushed by qrunner()
+func (l *Logger) qwrite(s string) {
+    // NB: close(ch) happens under the lock. Therefore, any writes
+    // to ch must also be under the same lock. Thus, z == 0 tells
+    // us that the channel is alive and kicking, and therefore, we can shove
+    // some items to it.
+    l.ch.Lock()
+    if z := atomic.LoadUint32(&l.ch.closed); z == 0 {
+        l.ch.logch <- s
+    }
+    l.ch.Unlock()
+}
+
+
 // Enqueue a log-write to happen asynchronously
 func (l *Logger)  Output(calldepth int, prio Priority, s string) {
-    if z := atomic.LoadUint32(&l.ch.closed); z == 0 {
-        if calldepth > 0 { calldepth += 1 }
-        l.ch.logch <- l.ofmt(calldepth, prio, s)
-    }
+    if calldepth > 0 { calldepth += 1 }
+    t := l.ofmt(calldepth, prio, s)
+
+    l.qwrite(t)
 }
+
 
 // Write to the underlying FD directly; INTERNAL USE ONLY
 func (l *Logger) directWrite(calldepth int, prio Priority, s string) {
-    if z := atomic.LoadUint32(&l.ch.closed); z == 0 {
-        if calldepth > 0 { calldepth += 1 }
-        t := l.ofmt(calldepth, prio, s)
-        l.out.Write([]byte(t))
-    }
+    if calldepth > 0 { calldepth += 1 }
+    t := l.ofmt(calldepth, prio, s)
+    l.out.Write([]byte(t))
 }
+
 
 // Dump stack backtrace for 'depth' levels
 // Backtrace is of the form "file:line [func name]"
