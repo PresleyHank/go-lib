@@ -7,22 +7,31 @@
 package logger
 
 import (
-    gl "log"
+    stdlog "log"
 )
 
 // Return an instance of self that satisfies stdlib logger
-func (l *Logger) StdLogger() *gl.Logger {
+func (l *Logger) StdLogger() *stdlog.Logger {
 
-    fl := gl.LUTC
-    if 0 != (l.flag&Ldate)          { fl |= gl.Ldate }
-    if 0 != (l.flag&Ltime)          { fl |= gl.Ltime }
-    if 0 != (l.flag&Lmicroseconds)  { fl |= gl.Lmicroseconds }
-    if 0 != (l.flag&Llongfile)      { fl |= gl.Llongfile }
-    if 0 != (l.flag&Lshortfile)     { fl |= gl.Lshortfile }
+    l.mu.Lock()
+    defer l.mu.Unlock()
 
-    // here 'l' is the io.Writer
-    l2 := gl.New(l, l.prefix, fl)
-    return l2
+    gl := l.gl
+    if gl == nil {
+        fl := stdlog.LUTC
+        if 0 != (l.flag&Ldate)          { fl |= stdlog.Ldate }
+        if 0 != (l.flag&Ltime)          { fl |= stdlog.Ltime }
+        if 0 != (l.flag&Lmicroseconds)  { fl |= stdlog.Lmicroseconds }
+        if 0 != (l.flag&Llongfile)      { fl |= stdlog.Llongfile }
+        if 0 != (l.flag&Lshortfile)     { fl |= stdlog.Lshortfile }
+
+        // here first argument 'l' is the io.Writer; we provide its
+        // interface implementation below.
+        gl = stdlog.New(l, l.prefix, fl)
+        l.gl = gl
+    }
+
+    return gl
 }
 
 

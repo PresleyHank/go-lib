@@ -62,6 +62,7 @@ import (
     "io"
     "os"
     "fmt"
+    stdlog "log"
     "sync"
     "time"
     "errors"
@@ -187,6 +188,8 @@ type Logger struct {
 
     ch     *outch           // output chan
     wait   chan bool        // wait chan for closing the log
+
+    gl     *stdlog.Logger   // cached pointer to stdlogger if any; created by StdLogger()
 }
 
 
