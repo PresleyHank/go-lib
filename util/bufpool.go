@@ -13,39 +13,53 @@
 
 package util
 
-// A fixed-size buffer-pool backed by a channel. Callers are
-// expected to free the buffer back to its originating pool.
+// A fixed-size buffer-pool backed by a channel and hence, callers
+// are blocked if there are no more buffers available.
+// Callers are expected to free the buffer back to its
+// originating pool.
 type Bufpool struct {
-    Size int
-    q    chan interface{}
+	Size int
+	q    chan interface{}
 }
 
 // Default pool size
 const Poolsize = 64
 
-// Create a new Bufpool. The caller is responsible for filling this
-// pool with initial data.
-func NewBufpool(sz int) *Bufpool {
-    if sz <= 0 { sz = Poolsize }
+// NewBufpool creates a new Bufpool. The caller supplies a
+// constructor for creating new buffers and filling the
+// queue with initial elements.
+func NewBufpool(sz int, ctor func() interface{}) *Bufpool {
+	if sz <= 0 {
+		sz = Poolsize
+	}
 
-    b  := &Bufpool{Size: sz}
-    b.q = make(chan interface{}, sz)
+	b := &Bufpool{Size: sz}
+	b.q = make(chan interface{}, sz)
 
-    return b
+	for i := 0; i < sz; i++ {
+		b.q <- ctor()
+	}
+
+	return b
 }
-
 
 // Put an item into the bufpool. This should not ever block; it
 // indicates pool integrity failure (duplicates or erroneous Puts).
 func (b *Bufpool) Put(o interface{}) {
-    b.q <- o
+	select {
+	case b.q <- o:
+		break
+	default:
+		panic("Bufpool put blocked. Queue corrupt?")
+	}
 }
 
 // Get the next available item from the pool; block the caller if
 // none are available.
 func (b *Bufpool) Get() interface{} {
-    o := <- b.q
-    return o
+	o := <-b.q
+	return o
 }
 
 // EOF
+// vim: ft=go:sw=8:ts=8:noexpandtab:tw=98:

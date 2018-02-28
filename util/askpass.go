@@ -10,38 +10,45 @@
 package util
 
 import (
-    "fmt"
-    "syscall"
+	"fmt"
+	"syscall"
 
-    "golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
-
-// Ask user for an interactive password.
+// Askpass prompts user for an interactive password.
 // If verify is true, confirm a second time.
 // Mistakes during confirmation cause the process to restart upto a
 // maximum of 2 times.
 func Askpass(prompt string, verify bool) (string, error) {
 
-    for i := 0; i < 2; i++ {
-        fmt.Printf("%s: ", prompt)
-        pw1, err := terminal.ReadPassword(int(syscall.Stdin))
-        fmt.Printf("\n")
-        if err != nil { return "", err }
-        if !verify { return string(pw1), nil }
+	for i := 0; i < 2; i++ {
+		fmt.Printf("%s: ", prompt)
+		pw1, err := terminal.ReadPassword(int(syscall.Stdin))
+		fmt.Printf("\n")
+		if err != nil {
+			return "", err
+		}
+		if !verify {
+			return string(pw1), nil
+		}
 
-        fmt.Printf("%s again: ", prompt)
-        pw2, err := terminal.ReadPassword(int(syscall.Stdin))
-        fmt.Printf("\n")
-        if err != nil { return "", err }
+		fmt.Printf("%s again: ", prompt)
+		pw2, err := terminal.ReadPassword(int(syscall.Stdin))
+		fmt.Printf("\n")
+		if err != nil {
+			return "", err
+		}
 
-        a := string(pw1)
-        b := string(pw2)
-        if a == b { return a, nil }
+		a := string(pw1)
+		b := string(pw2)
+		if a == b {
+			return a, nil
+		}
 
-        fmt.Printf("** password mismatch; try again ..\n")
-    }
+		fmt.Printf("** password mismatch; try again ..\n")
+	}
 
-    return "", fmt.Errorf("Too many tries getting password")
+	return "", fmt.Errorf("Too many tries getting password")
 }
-
+// vim: ft=go:sw=8:ts=8:noexpandtab:tw=98:

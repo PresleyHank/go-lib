@@ -12,46 +12,45 @@
 // semaphore for Go.
 package sem
 
-
 type signal struct{}
 
 // Type representing a semaphore
 type Sem struct {
-    some chan signal
-    none chan signal
-    count uint32
+	some  chan signal
+	none  chan signal
+	count uint32
 }
 
 // Create a new counting semaphore instance
 func NewSem(n uint32) *Sem {
-    s := &Sem{make(chan signal, 1), make(chan signal, 1), n}
-    if n == 0 {
-        s.none <- signal{}
-    } else {
-        s.some <- signal{}
-    }
-    return s
+	s := &Sem{make(chan signal, 1), make(chan signal, 1), n}
+	if n == 0 {
+		s.none <- signal{}
+	} else {
+		s.some <- signal{}
+	}
+	return s
 }
 
 // Acquire a semaphore
 func (s *Sem) P() {
-    <-s.some
-    s.count--
-    if s.count == 0 {
-        s.none <- signal{}
-    } else {
-        s.some <- signal{}
-    }
+	<-s.some
+	s.count--
+	if s.count == 0 {
+		s.none <- signal{}
+	} else {
+		s.some <- signal{}
+	}
 }
 
 // Release a semaphore
 func (s *Sem) V() {
-    select {
-        case <-s.some:
-        case <-s.none:
-    }
-    s.count++
-    s.some <- signal{}
+	select {
+	case <-s.some:
+	case <-s.none:
+	}
+	s.count++
+	s.some <- signal{}
 }
 
 // EOF

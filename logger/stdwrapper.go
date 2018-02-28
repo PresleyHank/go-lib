@@ -41,3 +41,4 @@ func (l *Logger) Write(b []byte) (int, error) {
     return len(b), nil
 }
 
+// vim: ft=go:sw=8:ts=8:noexpandtab:tw=98:
